@@ -1,0 +1,12 @@
+Guide for deploying flask app on Ubuntu 14.04
+
+sudo apt-get install apache2
+
+permissions:
+[3~https://askubuntu.com/questions/767504/permissions-problems-with-var-www-html-and-my-own-home-directory-for-a-website
+
+https://devops.profitbricks.com/tutorials/deploy-a-flask-application-on-ubuntu-1404/
+
+Key learnings:
+pip needs to be run as sudo so that wsgi can use the depandancies
+
