@@ -9,6 +9,7 @@
 import pickle
 from flask import Flask, request
 from flask_restful import Resource, Api
+import crypt
 
 app = Flask(__name__)
 api = Api(app)
@@ -19,7 +20,11 @@ data_path = "/var/www/Flask/Scheme/data/"
 class RegisteredCards(Resource):
     def get(self):
         data = load_obj("purchase_data")
-        return data.keys()
+        hashes = data.keys()
+        double_hashes = []
+        for key in hashes:
+            double_hashes.append(get_hash(key))
+        return double_hashes
 
 class LogCardTouch(Resource):
     def put(self):
@@ -48,6 +53,8 @@ def load_obj(name ):
     with open(data_path + name + '.pkl', 'rb') as f:
         return pickle.load(f)
 
+def get_hash(raw_id):
+    return str(crypt.crypt(raw_id, "$6$").replace("$6$$","").replace(" ",""))
 
 if __name__ == '__main__':
     #app.run(debug=True)
