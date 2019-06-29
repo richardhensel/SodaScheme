@@ -19,7 +19,7 @@ touch_light = LED(17) # blue
 
 # log output direction
 log_to_file = True
-log_to_screen = False
+log_to_screen = True
 
 def run():
     alert_startup()
@@ -36,9 +36,11 @@ def run():
                 elif 'UID' in output:
                     card_id = output.split(':')[1].replace('\n', '').replace(' ', '')
                     id_hash = get_hash(card_id)
+                    double_hash = get_hash(id_hash)
+                    print_stamped("double hash: " + double_hash)
 
                     # registered cards is a double hash
-                    if get_hash(id_hash) in registered_cards:
+                    if double_hash in registered_cards:
                         display_card_detected()
                         print_stamped('Registered card logged: ' + id_hash)
                         log_card_touch(id_hash)
@@ -68,6 +70,7 @@ def get_registered_cards():
     query_string = "http://" + os.environ["SCHEME_SERVER_HOST"] + ":8080/getregisteredcards"
     print_stamped(query_string)
     response = requests.get(query_string)
+    cards = []
     if response.status_code == 200:
         cards = str(response.text)
         cards = cards.replace("[", "").replace("]", "").replace('\n', "").replace('"', "").replace(" ", "").split(",")
