@@ -1,0 +1,14 @@
+[Unit]
+Description=A service that runs the nfc_reader application
+After=network.target
+
+[Service]
+User=pi
+ExecStart=/home/pi/nfc_reader.py
+Restart=always
+RestartSec=5
+EnvironmentFile=/home/pi/.bash_vars
+
+[Install]
+WantedBy=multi-user.target
+
