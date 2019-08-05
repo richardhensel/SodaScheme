@@ -24,7 +24,8 @@ sudo chown root:root /var/www
 sudo chown -R $USER:www-data /var/www/*
 sudo chmod -R 755 /var/www
 
-chmod g+rw /var/www/Flask/Scheme/data/purchase_data.pkl
+chmod 775 /var/www/Flask/Scheme/data/
+chmod 775 /var/www/Flask/Scheme/data/database.db
 
 a2ensite SchemeApp.conf
 a2enconf SchemePorts.conf

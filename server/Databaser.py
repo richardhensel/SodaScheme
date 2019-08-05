@@ -90,33 +90,18 @@ class Databaser:
         connection.close()
 
 
-    def create_user_with_card(self, card_hash, first_name, last_name, email, phone_number, starting_balance):
-        connection = sqlite3.connect(self.path)
-        cursor = connection.cursor()
+    def add_user(self, card_hash, first_name, last_name, email, phone_number, starting_balance):
 
-        ## check that the user doesn't already exist. if so, exit
-        query = "SELECT email from Users;"
-        cursor.execute(query)
-        query_result = cursor.fetchall()
-        #get id list, converted to numbers
-        for row in query_result:
-            if email == str(row[0]):
-                return "0. User with email {} already in database.".format(email)
+        ## check that the email doesn't already exist. if so, exit
+        if self.check_email_exists(email):
+            return "0. User with email {} already in database.".format(email) 
 
-        ## check that the user doesn't already exist. if so, exit
-        query = "SELECT card_hash from Cards;"
-        cursor.execute(query)
-        query_result = cursor.fetchall()
-        #get id list, converted to numbers
-        for row in query_result:
-            if card_hash == str(row[0]):
-                return "0. User with card_hash {} already in database.".format(card_hash)
- 
-        connection.commit()
-        connection.close()            
+        ## check that the card_hash doesn't already exist. if so, exit    
+        if self.check_card_hash_exists(card_hash):
+            return "0. User with card_hash {} already in database.".format(card_hash)
 
         ## create unique user_id for the user.
-        user_id, status = self.create_user_id()
+        user_id, status = self.create_unique_user_id()
         if "0. " in status:
             return status
 
@@ -124,7 +109,7 @@ class Databaser:
         card = Card()
         card.user_id = user_id
         card.card_hash = card_hash
-        self.add_card(card)
+        self.add_card_data(card)
 
         # create the entry in Users table
         user = User()
@@ -133,7 +118,7 @@ class Databaser:
         user.last_name = last_name
         user.email = email
         user.phone_number = phone_number
-        self.add_user(user)
+        self.add_user_data(user)
 
         # add starting balance to transactions (if necessary)
         # if starting_balance is not "0":
@@ -147,24 +132,24 @@ class Databaser:
         current_balance.user_id = user_id
         current_balance.current_balance = starting_balance
 
-        self.update_current_balance(current_balance)
+        self.update_current_balance_data(current_balance)
 
         return "1. Successfully added user with email: {}, assigned user_id: {}".format(email, user_id)
 
 
     def add_purchase(self, card_hash, time_unix, item, price):
 
-        user_id, status = self.get_user_id_from_card_hash(card_hash)
+        user_id, status = self.get_user_id_by_card_hash(card_hash)
         if "0. " in status:
             return status
 
         # create unique transaction id.
-        transaction_id, status = self.create_transaction_id()
+        transaction_id, status = self.create_unique_transaction_id()
         if "0. " in status:
             return status
 
         # calculate the current balance
-        previous_balance, status = self.get_current_balance(user_id)
+        previous_balance, status = self.get_current_balance_by_user_id(user_id)
         if "0. " in status:
             return status
 
@@ -178,13 +163,13 @@ class Databaser:
         transaction.transaction_value = str(-1 * abs(float(price)))
         transaction.time_unix = time_unix
         transaction.current_balance = str(previous_balance + (-1 * abs(float(price))))
-        self.add_transaction(transaction)
+        self.add_transaction_data(transaction)
 
         # udpate the current balance by doing some math. 
         current_balance = Current_Balance
         current_balance.user_id = user_id
         current_balance.current_balance = transaction.current_balance
-        self.update_current_balance(current_balance)
+        self.update_current_balance_data(current_balance)
 
         return "1. purchase successfully registered. Current balance: {}".format(transaction.current_balance)
 
@@ -192,18 +177,18 @@ class Databaser:
 
     def add_payment(self, email, time_unix, payment_amount):
 
-        user_id, status = self.get_user_id_from_email(email)
+        user_id, status = self.get_user_id_by_email(email)
 
         if "0. " in status:
             return status
 
         # create unique transaction id.
-        transaction_id, status = self.create_transaction_id()
+        transaction_id, status = self.create_unique_transaction_id()
         if "0. " in status:
             return status
 
         # calculate the current balance
-        previous_balance, status = self.get_current_balance(user_id)
+        previous_balance, status = self.get_current_balance_by_user_id(user_id)
         if "0. " in status:
             return status
 
@@ -216,28 +201,61 @@ class Databaser:
         transaction.transaction_value = str(abs(float(payment_amount)))
         transaction.time_unix = time_unix
         transaction.current_balance = str(previous_balance + (abs(float(payment_amount))))
-        self.add_transaction(transaction)
+        self.add_transaction_data(transaction)
 
         # udpate the current balance by doing some math. 
         current_balance = Current_Balance
         current_balance.user_id = user_id
         current_balance.current_balance = transaction.current_balance
-        self.update_current_balance(current_balance)
+        self.update_current_balance_data(current_balance)
 
         return "1. payment successfully registered. Current balance: {}".format(transaction.current_balance)
 
+    def check_email_exists(self, email):
+        connection = sqlite3.connect(self.path)
+        cursor = connection.cursor()
+        query = "SELECT email from Users;"
+        cursor.execute(query)
+        query_result = cursor.fetchall()
 
-    def get_balance_for_user(self, email):
+        connection.commit()
+        connection.close()
 
-        user_id, status = self.get_user_id_from_email(email)
-        current_balance, status = self.get_current_balance(user_id)
+        #get id list, converted to numbers
+        for row in query_result:
+            if email == str(row[0]):
+                return 1
+
+        return 0
+
+    def check_card_hash_exists(self, card_hash):
+        connection = sqlite3.connect(self.path)
+        cursor = connection.cursor()
+        query = "SELECT card_hash from Cards;"
+        cursor.execute(query)
+        query_result = cursor.fetchall()
+
+        connection.commit()
+        connection.close()
+
+        #get id list, converted to numbers
+        for row in query_result:
+            if card_hash == str(row[0]):
+                return True
+        return False
+
+
+    def get_balance_by_email(self, email):
+
+        user_id, status = self.get_user_id_by_email(email)
+        current_balance, status = self.get_current_balance_by_user_id(user_id)
 
         if "0. " in status:
             return 0, status
         else:
             return current_balance, "1. successfully retrieved balance for email {}".format(email)
 
-    def get_user_id_from_email(self, email):
+    def get_user_id_by_email(self, email):
         connection = sqlite3.connect(self.path)
         cursor = connection.cursor()
 
@@ -268,13 +286,15 @@ class Databaser:
 
         return user_id, status
 
-    def get_user_id_from_card_hash(self, card_hash):
+    def get_user_id_by_card_hash(self, card_hash):
         connection = sqlite3.connect(self.path)
         cursor = connection.cursor()
         # get user_id assigned to this hash
         query = "SELECT * FROM Cards;"
         cursor.execute(query)
         query_result = cursor.fetchall()
+        connection.commit()
+        connection.close()
 
         id_list = []
         hash_list = []
@@ -294,12 +314,11 @@ class Databaser:
             user_id = id_list[hash_list.index(card_hash)]
             status = "1. Successfully retrieved user_id."
             
-        connection.commit()
-        connection.close()
+
 
         return user_id, status
 
-    def create_user_id():
+    def create_unique_user_id(self):
         connection = sqlite3.connect(self.path)
         cursor = connection.cursor()
 
@@ -322,7 +341,7 @@ class Databaser:
 
         return user_id, "1. success generating user id"
 
-    def create_transaction_id(self):
+    def create_unique_transaction_id(self):
         connection = sqlite3.connect(self.path)
         cursor = connection.cursor()
 
@@ -345,7 +364,7 @@ class Databaser:
 
         return transaction_id, "1. success generating transaction id"
 
-    def get_current_balance(self, user_id):
+    def get_current_balance_by_user_id(self, user_id):
         connection = sqlite3.connect(self.path)
         cursor = connection.cursor()
 
@@ -360,10 +379,10 @@ class Databaser:
         current_balance = 0
         status = ""
         if len(value_list) == 0:
-            status = "0. No transactions registered to this user."
+            status = "2. No transactions registered to this user."
         else:
             current_balance = sum(value_list)
-            status = "1.successfully retrieved current balance."
+            status = "1. Successfully retrieved current balance."
 
         connection.commit()
         connection.close()
@@ -371,7 +390,24 @@ class Databaser:
         return current_balance, status
 
 
-    def add_user(self, data):
+    def get_card_hash_list(self):
+        connection = sqlite3.connect(self.path)
+        cursor = connection.cursor()
+        # get user_id assigned to this hash
+        query = "SELECT * FROM Cards;"
+        cursor.execute(query)
+        query_result = cursor.fetchall()
+        connection.commit()
+        connection.close()
+
+        hash_list = []
+        for row in query_result:
+            hash_list.append(str(row[1]))
+
+        return hash_list
+
+
+    def add_user_data(self, data):
         connection = sqlite3.connect(self.path)
         cursor = connection.cursor()
 
@@ -388,7 +424,7 @@ class Databaser:
         connection.commit()
         connection.close()
 
-    def add_card(self, data):
+    def add_card_data(self, data):
         connection = sqlite3.connect(self.path)
         cursor = connection.cursor()
 
@@ -403,7 +439,7 @@ class Databaser:
         connection.close()      
 
 
-    def update_current_balance(self, data):
+    def update_current_balance_data(self, data):
         connection = sqlite3.connect(self.path)
         cursor = connection.cursor()
 
@@ -417,7 +453,7 @@ class Databaser:
         connection.commit()
         connection.close()
 
-    def add_transaction(self, data):
+    def add_transaction_data(self, data):
         connection = sqlite3.connect(self.path)
         cursor = connection.cursor()
 
@@ -444,18 +480,21 @@ if __name__ == "__main__":
     time_stamp = str(int(time.time()))  
 
 
-    return_val = db.create_user_with_card("1234", "steve", "jones", "lol6@webz.com", "1234", "0")
+    # return_val = db.add_user("1234", "steve", "jones", "lol6@webz.com", "1234", "0")
+    # print return_val
+
+    return_val = db.add_user("E.u2CiZrZ137BI.RTR8jsApZCHWYhVcTfhmJ9SOZFidDDMUb6DuRK8beKByrP7mmzXvIpvCvmy3YOFwD66Mny.", "dicky", "h", "lol@webz.com", "1234", "0")
     print return_val
 
-    return_val = db.add_purchase("1234", time_stamp, "coke", "1.20")
+    return_val = db.add_purchase("E.u2CiZrZ137BI.RTR8jsApZCHWYhVcTfhmJ9SOZFidDDMUb6DuRK8beKByrP7mmzXvIpvCvmy3YOFwD66Mny.", time_stamp, "coke", "1.20")
     print return_val
 
-    return_val = db.add_purchase("1234", time_stamp, "coke", "1.20")
+    # return_val = db.add_purchase("1234", time_stamp, "coke", "1.20")
+    # print return_val
+
+    return_val = db.add_payment("lol@webz.com", time_stamp, "1.20")
     print return_val
 
-    return_val = db.add_payment("lol6@webz.com", time_stamp, "2.5")
-    print return_val
-
-    return_val, status = db.get_balance_for_user("lol6@webz.com")
+    return_val, status = db.get_balance_by_email("lol@webz.com")
     print "balance: " + str(return_val) + " " + status
     
